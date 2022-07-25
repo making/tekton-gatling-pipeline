@@ -1,0 +1,52 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: gatling-test
+spec:
+  params:
+  - name: target_url
+    type: string
+  - name: duration
+    type: string
+    default: 60s
+  - name: requests
+    type: string
+    default: "300" 
+  - name: config_repo
+    type: string
+    default: https://github.com/making/concourse-gatling-pipeline.git
+  tasks:
+  - name: gatling-test
+    params:
+    - name: target_url
+      value: $(params.target_url)
+    - name: duration
+      value: $(params.duration)
+    - name: requests
+      value: $(params.requests)
+    - name: config_repo
+      value: $(params.config_repo)
+    taskSpec:
+      params:
+      - name: target_url
+      - name: duration
+      - name: requests
+      - name: config_repo  
+      steps:
+      - name: git-clone
+        image: alpine/git
+        workingDir: /workspace
+        script: |
+          #!/usr/bin/env sh
+          git clone $(params.config_repo)
+      - name: run-gatling
+        image: ghcr.io/making/gatling
+        workingDir: /workspace
+        script: |
+          #!/bin/bash
+          set -ex
+          cd $(basename $(params.config_repo) | sed 's/\.git//g')
+          export JAVA_OPTS="-Dtarget_url=$(params.target_url) -Dduration=$(params.duration) -Drequests=$(params.requests)"
+          gatling.sh -rd run -s computerdatabase.CFSimulation
+          find /opt/gatling/results/*
